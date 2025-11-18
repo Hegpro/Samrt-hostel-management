@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema(
       enum: ["chiefWarden", "warden", "staff", "student", "parent", "messManager", "ngo"],
     },
 
+    staffType: {
+        type: String,
+        enum: ["electrician", "plumber", "cleaner", "carpenter", "roomBoy", "security", "other"],
+        default: null
+    },
+
     // student-specific
     usn: { type: String, unique: true, sparse: true }, // 12-char unique for students
 

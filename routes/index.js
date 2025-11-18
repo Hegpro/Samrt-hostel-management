@@ -8,11 +8,39 @@ import reportRoutes from "./report.routes.js";
 
 const router = express.Router();
 
-router.use("/auth", authRoutes);
-router.use("/rooms", roomRoutes);
-router.use("/complaints", complaintRoutes);
-router.use("/mess", messRoutes);
-router.use("/ngo", ngoRoutes);
-router.use("/reports", reportRoutes);
+console.log("📌 LOADED ROUTES INDEX FROM:", import.meta.url);
+
+
+console.log("INDEX ROUTES FILE LOADED");
+
+router.use("/auth", (req, res, next) => {
+  console.log("AUTH ROUTER HIT");
+  next();
+}, authRoutes);
+
+router.use("/rooms", (req, res, next) => {
+  console.log("ROOM ROUTER HIT");
+  next();
+}, roomRoutes);
+
+router.use("/complaints", (req, res, next) => {
+  console.log("COMPLAINT ROUTER HIT");
+  next();
+}, complaintRoutes);
+
+router.use("/mess", (req, res, next) => {
+  console.log("MESS ROUTER HIT");
+  next();
+}, messRoutes);
+
+router.use("/ngo", (req, res, next) => {
+  console.log("NGO ROUTER HIT");
+  next();
+}, ngoRoutes);
+
+router.use("/reports", (req, res, next) => {
+  console.log("REPORT ROUTER HIT");
+  next();
+}, reportRoutes);
 
 export default router;

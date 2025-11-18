@@ -2,7 +2,7 @@ import express from "express";
 const router = express.Router();
 
 router.get("/test", (req, res) => {
-  res.json({ message: "Room route working!" });
+  res.json({ message: "room route working!" });
 });
 
 export default router;

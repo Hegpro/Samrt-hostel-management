@@ -59,21 +59,39 @@ export const createWarden = async (req, res) => {
 // WARDEN: create staff (no email required)
 export const createStaff = async (req, res) => {
   try {
-    const { name, phone, designation } = req.body;
+    const { name, phone, staffType } = req.body;
+
     if (!name) return res.status(400).json({ message: "name required" });
+    if (!staffType) return res.status(400).json({ message: "staffType required" });
 
     const rawPass = generatePassword(8);
     const hashed = await bcrypt.hash(rawPass, SALT_ROUNDS);
 
     const staff = await User.create({
-      name, phone, role: "staff", password: hashed, createdBy: req.user.id, tempPassword: true
+      name,
+      phone,
+      role: "staff",
+      staffType,
+      password: hashed,
+      createdBy: req.user.id,
+      tempPassword: true
     });
 
-    return res.status(201).json({ message: "Staff created", staff: { id: staff._id, name: staff.name }, password: rawPass });
+    return res.status(201).json({
+      message: "Staff created",
+      staff: {
+        id: staff._id,
+        name: staff.name,
+        staffType: staff.staffType
+      },
+      password: rawPass
+    });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
+
 
 // CHIEF: create student (with USN + room)
 export const createStudent = async (req, res) => {
@@ -118,23 +136,122 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// NGO: public register (self signup)
-export const registerNGO = async (req, res) => {
+// CHIEF: create mess manager
+export const createMessManager = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ message: "name, email, password required" });
+    const { name, email, phone } = req.body;
 
+    if (!name || !email) {
+      return res.status(400).json({ message: "name and email required" });
+    }
+
+    // ensure email unique
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "Email already exists" });
+    if (exists) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
 
-    const hashed = await bcrypt.hash(password, SALT_ROUNDS);
-    const ngo = await User.create({ name, email, password: hashed, role: "ngo", createdBy: null, tempPassword: false, emailVerified: true });
+    // generate password
+    const rawPass = generatePassword(10);
+    const hashed = await bcrypt.hash(rawPass, 10);
 
-    return res.status(201).json({ message: "NGO registered", ngo: { id: ngo._id, email: ngo.email } });
+    const messManager = await User.create({
+      name,
+      email,
+      phone,
+      role: "messManager",
+      password: hashed,
+      createdBy: req.user.id,
+      tempPassword: true
+    });
+
+    return res.status(201).json({
+      message: "Mess Manager created",
+      manager: {
+        id: messManager._id,
+        email: messManager.email,
+        name: messManager.name
+      },
+      password: rawPass
+    });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
+
+
+// NGO: public register (self signup)
+export const sendNGOVerificationCode = async (req, res) => {
+  try {
+    const { email, name } = req.body;
+
+    if (!email || !name)
+      return res.status(400).json({ message: "name and email required" });
+
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(400).json({ message: "Email already exists" });
+
+    const code = crypto.randomInt(100000, 999999).toString();
+
+    // store OTP temporarily (no password yet)
+    await User.create({
+      name,
+      email,
+      role: "ngo",
+      password: "TEMP",         // placeholder, will update after OTP verification
+      emailVerificationCode: code,
+      emailVerificationExpiry: new Date(Date.now() + 10 * 60 * 1000), // 10 min
+      tempPassword: true,
+      emailVerified: false
+    });
+
+    // send OTP
+    await sendEmail({
+      to: email,
+      subject: "NGO Verification Code",
+      text: `Your NGO verification code is ${code}`
+    });
+
+    return res.json({ message: "Verification code sent to email" });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const verifyNGOCodeAndRegister = async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+
+    if (!email || !code || !password)
+      return res.status(400).json({ message: "email, code & password required" });
+
+    const ngo = await User.findOne({ email });
+    if (!ngo) return res.status(400).json({ message: "NGO not found" });
+
+    if (!ngo.emailVerificationCode || ngo.emailVerificationExpiry < new Date())
+      return res.status(400).json({ message: "OTP expired" });
+
+    if (ngo.emailVerificationCode !== code)
+      return res.status(400).json({ message: "Invalid code" });
+
+    // Save real password
+    ngo.password = await bcrypt.hash(password, 10);
+    ngo.emailVerificationCode = null;
+    ngo.emailVerificationExpiry = null;
+    ngo.emailVerified = true;
+    await ngo.save();
+
+    return res.json({ message: "NGO registered successfully" });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
+
 
 // change password (provide oldPassword) - authenticated
 export const changePassword = async (req, res) => {
