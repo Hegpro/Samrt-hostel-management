@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
 
-    email: { type: String, unique: true, sparse: true }, // sparse: allows nulls for staff who may not have email
+    email: { type: String, unique: true, sparse: true, default: null }, // sparse: allows nulls for staff who may not have email
     phone: { type: String },
 
     password: { type: String, required: true },

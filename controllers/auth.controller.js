@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/user.model.js";
+import Room from "../models/room.model.js";
 import { generatePassword } from "../utils/password.js";
 import { sendEmail } from "../utils/email.js";
 
@@ -93,24 +94,74 @@ export const createStaff = async (req, res) => {
 };
 
 
-// CHIEF: create student (with USN + room)
+// CHIEF: create student + assign room
 export const createStudent = async (req, res) => {
   try {
     const { name, usn, email, phone, hostelId, roomId } = req.body;
-    if (!name || !usn || !hostelId || !roomId) return res.status(400).json({ message: "name, usn, hostelId and roomId required" });
 
-    // ensure usn unique
+    // Validate required fields
+    if (!name || !usn || !hostelId || !roomId) {
+      return res.status(400).json({ 
+        message: "name, usn, hostelId & roomId are required" 
+      });
+    }
+
+    // Ensure USN is unique
     const existsUSN = await User.findOne({ usn });
-    if (existsUSN) return res.status(400).json({ message: "USN already used" });
+    if (existsUSN) {
+      return res.status(400).json({ message: "USN already assigned to another student" });
+    }
 
+    // Check if room exists
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    // Check room belongs to the same hostel
+    if (room.hostelId.toString() !== hostelId) {
+      return res.status(400).json({ message: "Room does not belong to selected hostel" });
+    }
+
+    // Check room status
+    if (room.status === "maintenance") {
+      return res.status(400).json({ message: "Room is under maintenance" });
+    }
+
+    // Check room capacity
+    if (room.occupants.length >= room.capacity) {
+      return res.status(400).json({ message: "Room is already full" });
+    }
+
+    // Generate password for student + parent
     const rawPass = generatePassword(10);
-    const hashed = await bcrypt.hash(rawPass, SALT_ROUNDS);
+    const hashed = await bcrypt.hash(rawPass, 10);
 
+    // Create student
     const student = await User.create({
-      name, usn, email: email || null, phone, hostelId, roomId, role: "student", password: hashed, createdBy: req.user.id, tempPassword: true
+      name,
+      usn,
+      email: email || null,
+      phone,
+      hostelId,
+      roomId,
+      role: "student",
+      password: hashed,
+      createdBy: req.user.id,
+      tempPassword: true
     });
 
-    // create parent user linked to student with same credentials (parent has same password and maybe email provided)
+    // Add student to room occupants
+    room.occupants.push(student._id);
+
+    // Auto-update room status to full if capacity reached
+    if (room.occupants.length >= room.capacity) {
+      room.status = "full";
+    }
+
+    await room.save();
+
+    // Create parent (optional)
     let parent = null;
     if (req.body.parentName) {
       parent = await User.create({
@@ -119,18 +170,23 @@ export const createStudent = async (req, res) => {
         phone: req.body.parentPhone || null,
         role: "parent",
         password: hashed,
-        createdBy: req.user.id,
         linkedStudent: student._id,
+        createdBy: req.user.id,
         tempPassword: true
       });
     }
 
     return res.status(201).json({
-      message: "Student created",
-      student: { id: student._id, usn: student.usn },
+      message: "Student created & room assigned",
+      student: {
+        id: student._id,
+        usn: student.usn,
+        assignedRoom: room.roomNumber
+      },
       password: rawPass,
       parent: parent ? { id: parent._id } : null
     });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
