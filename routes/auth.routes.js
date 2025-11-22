@@ -6,7 +6,7 @@ import {
   createStaff,
   createStudent,
   createMessManager, 
-    // registerNGO,
+  registerNGO,
   changePassword,
   sendPasswordResetCode,
   verifyCodeAndChangePassword,
@@ -104,5 +104,8 @@ router.post(
   },
   createStaff
 );
+
+router.post("/ngo/register", registerNGO);
+
 
 export default router;

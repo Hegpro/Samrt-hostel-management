@@ -276,6 +276,31 @@ export const sendNGOVerificationCode = async (req, res) => {
   }
 };
 
+export const registerNGO = async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Required fields missing" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const ngo = await User.create({
+      name,
+      email,
+      phone,
+      password: hashed,
+      role: "ngo",
+    });
+
+    res.status(201).json({ message: "NGO registered", ngo });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
 export const verifyNGOCodeAndRegister = async (req, res) => {
   try {
     const { email, code, password } = req.body;

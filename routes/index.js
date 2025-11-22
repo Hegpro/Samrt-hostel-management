@@ -7,6 +7,7 @@ import ngoRoutes from "./ngo.routes.js";
 import reportRoutes from "./report.routes.js";
 import hostelRoutes from "./hostel.routes.js";
 import noticeRoutes from "./notice.routes.js";
+import surplusRoutes from "./surplus.routes.js";
 
 const router = express.Router();
 
@@ -48,5 +49,7 @@ router.use("/reports", (req, res, next) => {
 router.use("/hostels", hostelRoutes);
 
 router.use("/notices", noticeRoutes);
+
+router.use("/surplus", surplusRoutes);
 
 export default router;

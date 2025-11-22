@@ -4,6 +4,8 @@ import express from "express";
 import connectDB from "./config/db.js";
 import cors from "cors";
 import routes from "./routes/index.js";
+import "./cron/surplusExpiry.js";
+
 
 // debug: check env variables
 console.log("===== ENV VARIABLES =====");
