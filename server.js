@@ -1,10 +1,19 @@
+import "./config/env.js";
 import express from "express";
-import dotenv from "dotenv";
+
 import connectDB from "./config/db.js";
 import cors from "cors";
 import routes from "./routes/index.js";
 
-dotenv.config();
+// debug: check env variables
+console.log("===== ENV VARIABLES =====");
+console.log("PORT:", process.env.PORT);
+console.log("MONGO_URI:", process.env.MONGO_URI ? "********" : null);
+console.log("JWT_SECRET:", process.env.JWT_SECRET ? "********" : null);
+console.log("CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME);
+console.log("CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? "********" : null);
+console.log("CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? "********" : null);
+console.log("=========================");
 connectDB();
 
 const app = express();

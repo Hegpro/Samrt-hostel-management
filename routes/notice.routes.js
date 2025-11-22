@@ -6,6 +6,8 @@ import {
 
 import { protect, authorizeRoles } from "../middlewares/auth.middleware.js";
 
+import upload from "../middlewares/uploadCloudinary.js"; // to handle file uploads
+
 const router = express.Router();
 
 /**
@@ -16,6 +18,7 @@ router.post(
   "/create",
   protect,
   authorizeRoles("chiefWarden", "warden"),
+  upload.single("image"),        // <-- MULTER handles the file
   createNotice
 );
 

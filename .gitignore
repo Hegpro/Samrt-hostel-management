@@ -37,3 +37,4 @@ out/
 .nuxt/
 # Gatsby files
 .cache/
+package-lock.json
