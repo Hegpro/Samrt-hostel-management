@@ -38,3 +38,4 @@ out/
 # Gatsby files
 .cache/
 package-lock.json
+package.json

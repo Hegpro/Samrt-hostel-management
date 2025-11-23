@@ -17,9 +17,9 @@ const userSchema = new mongoose.Schema(
     },
 
     staffType: {
-        type: String,
-        enum: ["electrician", "plumber", "cleaner", "carpenter", "roomBoy", "security", "other"],
-        default: null
+      type: String,
+      enum: ["electrician","plumber","cleaner","roomBoy","carpenter","civil"],
+      default: null
     },
 
     // student-specific
