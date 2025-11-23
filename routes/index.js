@@ -9,6 +9,7 @@ import hostelRoutes from "./hostel.routes.js";
 import noticeRoutes from "./notice.routes.js";
 import surplusRoutes from "./surplus.routes.js";
 import complaintRoutes from "./complaint.routes.js";
+import reportRoutes from "./report.routes.js";
 
 const router = express.Router();
 
@@ -54,5 +55,7 @@ router.use("/notices", noticeRoutes);
 router.use("/surplus", surplusRoutes);
 
 router.use("/complaints", complaintRoutes);
+
+router.use("/reports", reportRoutes);
 
 export default router;

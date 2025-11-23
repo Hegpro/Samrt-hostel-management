@@ -279,3 +279,150 @@ export const getChiefComplaints = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+
+// 4. COMPLAINT SUMMARY (counts by status, optional breakdown by category)
+// GET /api/reports/complaints/summary?hostelId=<>&from=YYYY-MM-DD&to=YYYY-MM-DD
+export const getComplaintSummary = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const { hostelId: qHostelId, from, to } = req.query;
+
+    // determine scope: chief sees all (unless hostelId provided), warden limited to his hostel
+    let hostelId = qHostelId;
+    if (user.role === "warden") hostelId = user.hostelId;
+
+    // build match stage
+    const match = {};
+    if (hostelId) match.hostelId = mongoose.Types.ObjectId(hostelId);
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = new Date(from);
+      if (to) match.createdAt.$lte = new Date(to);
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ];
+
+    const result = await Complaint.aggregate(pipeline);
+
+    // convert to object { pending: n, in-progress: m, closed: p, ... }
+    const summary = {};
+    result.forEach(r => (summary[r._id] = r.count));
+
+    // optional breakdown by category
+    const byCategory = await Complaint.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { category: "$category", status: "$status" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.category": 1 } }
+    ]);
+
+    return res.status(200).json({ message: "Complaint summary", summary, byCategory });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// 5. COMPLAINT TREND (monthly) - GET /api/reports/complaints/trend?hostelId=&months=6
+export const getComplaintTrendByMonth = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const months = parseInt(req.query.months, 10) || 6; // last N months
+    let hostelId = req.query.hostelId;
+    if (user.role === "warden") hostelId = user.hostelId;
+
+    const start = new Date();
+    start.setMonth(start.getMonth() - (months - 1));
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+
+    const match = { createdAt: { $gte: start } };
+    if (hostelId) match.hostelId = mongoose.Types.ObjectId(hostelId);
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ];
+
+    const rows = await Complaint.aggregate(pipeline);
+
+    // fill missing months with 0
+    const labels = [];
+    const counts = [];
+    const now = new Date();
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const keyYear = d.getFullYear();
+      const keyMonth = d.getMonth() + 1;
+      labels.push(`${keyYear}-${String(keyMonth).padStart(2, "0")}`);
+
+      const found = rows.find(r => r._id.year === keyYear && r._id.month === keyMonth);
+      counts.push(found ? found.count : 0);
+    }
+
+    return res.status(200).json({ message: "Complaint trend", labels, counts });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// 6. DETAILED COMPLAINT LIST with filters
+// GET /api/reports/complaints/list?hostelId=&status=&category=&from=&to=&page=&limit=
+export const getComplaintsList = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const { status, category, from, to, hostelId: qHostelId, page = 1, limit = 50 } = req.query;
+
+    let hostelId = qHostelId;
+    if (user.role === "warden") hostelId = user.hostelId;
+
+    const filter = {};
+    if (hostelId) filter.hostelId = mongoose.Types.ObjectId(hostelId);
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) filter.createdAt.$lte = new Date(to);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const complaints = await Complaint.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .populate("createdBy", "name usn roomId")
+      .populate({
+        path: "createdBy",
+        populate: { path: "roomId", select: "roomNumber floor type" }
+      })
+      .populate("handledBy", "name staffType");
+
+    const total = await Complaint.countDocuments(filter);
+
+    return res.status(200).json({ message: "Complaints list", complaints, total, page: Number(page), limit: Number(limit) });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
