@@ -23,7 +23,7 @@ import {
   getComplaintSummary,
   getComplaintTrendByMonth,
   getComplaintsList
-} from "../controllers/report/report.controller.js";
+} from "../controllers/complaint/complaint.controller.js";
 
 // Complaint reports
 router.get("/complaints/summary", protect, authorizeRoles("chiefWarden", "warden"), getComplaintSummary);
