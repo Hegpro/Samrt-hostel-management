@@ -31,7 +31,7 @@ export const getRoomOccupancy = async (req, res) => {
     const report = [];
 
     for (let h of hostels) {
-      const rooms = await Room.find({ hostelId: h._id }).populate("students", "name usn");
+      const rooms = await Room.find({ hostelId: h._id }).populate("occupants", "name usn");
 
       report.push({
         hostelName: h.name,

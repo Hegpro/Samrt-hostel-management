@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema(
     },
 
     // student-specific
-    usn: { type: String, unique: true, sparse: true }, // 12-char unique for students
+    usn: { type: String,sparse: true }, // 12-char unique for students
 
     // linkage
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // who created this account

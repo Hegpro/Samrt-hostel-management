@@ -14,7 +14,7 @@ const complaintSchema = new mongoose.Schema(
     // allowed values: electrical, plumbing, cleaning, roomBoy, other
     category: {
         type: String,
-        enum: ["electrical", "plumbing", "cleaning", "roomBoy", "carpenter", "civil", "other"],
+        enum: ["electrician", "plumber", "cleaner", "roomBoy", "carpenter", "civil"],
         required: true
     },
 

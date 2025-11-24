@@ -15,23 +15,70 @@ const signToken = (user) => jwt.sign({ id: user._id, role: user.role }, process.
 // PUBLIC: login by email or USN (student)
 export const login = async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier can be email or USN
-    if (!identifier || !password) return res.status(400).json({ message: "Provide identifier and password" });
+    const { identifier, password, role } = req.body;
 
-    let user = await User.findOne({ email: identifier });
-    if (!user) user = await User.findOne({ usn: identifier });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: "Provide identifier and password" });
+    }
 
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    let user = null;
 
+    // -----------------------------------------
+    // 1. If ROLE IS PARENT — special handling
+    // -----------------------------------------
+    if (role === "parent") {
+      user = await User.findOne({ role: "parent", usn: identifier });
+    }
+
+    // -----------------------------------------
+    // 2. If ROLE IS NOT PARENT — normal flow
+    // -----------------------------------------
+    if (!user) {
+      // Try email
+      user = await User.findOne({ email: identifier });
+
+      // Try USN (student login)
+      if (!user) user = await User.findOne({ usn: identifier });
+
+      // Try phone (staff login)
+      if (!user) user = await User.findOne({ phone: identifier });
+    }
+
+    // -----------------------------------------
+    // 3. User not found
+    // -----------------------------------------
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // -----------------------------------------
+    // 4. Validate password
+    // -----------------------------------------
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(400).json({ message: "Invalid credentials" });
+    if (!ok) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
+    // -----------------------------------------
+    // 5. Generate Token
+    // -----------------------------------------
     const token = signToken(user);
-    return res.json({ message: "Login successful", token, user: { id: user._id, name: user.name, role: user.role } });
+
+    return res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role
+      }
+    });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
+
 
 // CHIEF: create warden (chiefWarden only)
 export const createWarden = async (req, res) => {
@@ -57,13 +104,20 @@ export const createWarden = async (req, res) => {
   }
 };
 
-// WARDEN: create staff (no email required)
+// WARDEN: create staff
 export const createStaff = async (req, res) => {
   try {
-    const { name, phone, staffType } = req.body;
+    const { name, phone, email, staffType } = req.body;
 
     if (!name) return res.status(400).json({ message: "name required" });
+    if (!email) return res.status(400).json({ message: "Email required" });
     if (!staffType) return res.status(400).json({ message: "staffType required" });
+
+    // FETCH WARDEN TO GET hostelId
+    const warden = await User.findById(req.user.id);
+    if (!warden || warden.role !== "warden") {
+      return res.status(403).json({ message: "Only warden can create staff" });
+    }
 
     const rawPass = generatePassword(8);
     const hashed = await bcrypt.hash(rawPass, SALT_ROUNDS);
@@ -71,9 +125,11 @@ export const createStaff = async (req, res) => {
     const staff = await User.create({
       name,
       phone,
+      email,
       role: "staff",
       staffType,
       password: hashed,
+      hostelId: warden.hostelId,
       createdBy: req.user.id,
       tempPassword: true
     });
@@ -83,6 +139,7 @@ export const createStaff = async (req, res) => {
       staff: {
         id: staff._id,
         name: staff.name,
+        email: staff.email,
         staffType: staff.staffType
       },
       password: rawPass
@@ -97,100 +154,70 @@ export const createStaff = async (req, res) => {
 // CHIEF: create student + assign room
 export const createStudent = async (req, res) => {
   try {
-    const { name, usn, email, phone, hostelId, roomId } = req.body;
+    const { name, usn, phone, email, roomId } = req.body;
 
-    // Validate required fields
-    if (!name || !usn || !hostelId || !roomId) {
-      return res.status(400).json({ 
-        message: "name, usn, hostelId & roomId are required" 
-      });
-    }
-
-    // Ensure USN is unique
-    const existsUSN = await User.findOne({ usn });
-    if (existsUSN) {
-      return res.status(400).json({ message: "USN already assigned to another student" });
-    }
-
-    // Check if room exists
+    // 1. Validate room
     const room = await Room.findById(roomId);
-    if (!room) {
-      return res.status(404).json({ message: "Room not found" });
-    }
+    if (!room) return res.status(404).json({ message: "Room not found" });
 
-    // Check room belongs to the same hostel
-    if (room.hostelId.toString() !== hostelId) {
-      return res.status(400).json({ message: "Room does not belong to selected hostel" });
-    }
-
-    // Check room status
-    if (room.status === "maintenance") {
-      return res.status(400).json({ message: "Room is under maintenance" });
-    }
-
-    // Check room capacity
     if (room.occupants.length >= room.capacity) {
       return res.status(400).json({ message: "Room is already full" });
     }
 
-    // Generate password for student + parent
-    const rawPass = generatePassword(10);
-    const hashed = await bcrypt.hash(rawPass, 10);
+    // 2. Generate ONE password — for both student AND parent
+    const plainPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    // Create student
+    // 3. Create student
     const student = await User.create({
       name,
       usn,
-      email: email || null,
       phone,
-      hostelId,
-      roomId,
+      email,
       role: "student",
-      password: hashed,
-      createdBy: req.user.id,
-      tempPassword: true
+      hostelId: room.hostelId,
+      roomId: room._id,
+      password: hashedPassword,
+      tempPassword: true,
+      createdBy: req.user.id
     });
 
-    // Add student to room occupants
+    // Add student into room
     room.occupants.push(student._id);
-
-    // Auto-update room status to full if capacity reached
-    if (room.occupants.length >= room.capacity) {
-      room.status = "full";
-    }
-
     await room.save();
 
-    // Create parent (optional)
-    let parent = null;
-    if (req.body.parentName) {
-      parent = await User.create({
-        name: req.body.parentName,
-        email: req.body.parentEmail || null,
-        phone: req.body.parentPhone || null,
-        role: "parent",
-        password: hashed,
-        linkedStudent: student._id,
-        createdBy: req.user.id,
-        tempPassword: true
-      });
-    }
+    // 4. Create parent using SAME login credentials (shared)
+    const parent = await User.create({
+      name: `${student.name}'s Parent`,
+      role: "parent",
+      
+      // Parent uses student USN to login
+      usn: student.usn,
+
+      linkedStudent: student._id,
+
+      // Attach same hostel/room as student
+      hostelId: student.hostelId,
+      roomId: student.roomId,
+
+      // Use the SAME password
+      password: hashedPassword,
+      tempPassword: true,
+
+      createdBy: req.user.id
+    });
 
     return res.status(201).json({
-      message: "Student created & room assigned",
-      student: {
-        id: student._id,
-        usn: student.usn,
-        assignedRoom: room.roomNumber
-      },
-      password: rawPass,
-      parent: parent ? { id: parent._id } : null
+      message: "Student & Parent created successfully",
+      studentPassword: plainPassword,   // same as parent
+      parentPassword: plainPassword     // same password
     });
 
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
+
 
 // CHIEF: create mess manager
 export const createMessManager = async (req, res) => {
