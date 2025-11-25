@@ -4,6 +4,7 @@ import Hostel from "../../models/hostel.model.js";
 import Complaint from "../../models/complaint.model.js";
 import Notice from "../../models/notice.model.js";
 import SurplusFood from "../../models/surplus.model.js";
+import StudentComplaint from "../../models/studentComplaint.model.js";
 
 
 // =====================================================
@@ -75,18 +76,30 @@ export const getParentDashboard = async (req, res) => {
       (s) => s._id.toString() !== student._id.toString()
     );
 
+    // Existing: Hostel complaints created by student
     const complaints = await Complaint.find({ createdBy: student._id })
       .sort({ createdAt: -1 });
 
     const notices = await Notice.find()
       .sort({ createdAt: -1 });
 
+
+    //NEW: Parent–Student Complaints
+    const studentComplaints = await StudentComplaint.find({
+      parentId: parent._id
+    })
+      .sort({ createdAt: -1 })
+      .populate("raisedBy", "name role")
+      .populate("studentId", "name usn");
+
+    // Return added field: studentComplaints
     return res.status(200).json({
       student,
       hostel,
       room,
       roommates,
-      complaints,
+      complaints,          // normal maintenance complaints
+      studentComplaints,   // newly added
       notices
     });
 
@@ -94,6 +107,7 @@ export const getParentDashboard = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+
 
 
 // =====================================================

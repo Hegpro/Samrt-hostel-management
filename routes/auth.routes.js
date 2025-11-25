@@ -16,10 +16,26 @@ import {
 
 import { protect, authorizeRoles } from "../middlewares/auth.middleware.js";
 
-console.log("🚨 I AM IN THE AUTH ROUTES FILE YOU EDITED!");
+console.log(" I AM IN THE AUTH ROUTES FILE YOU EDITED!");
 
 
 const router = express.Router();
+
+import { sendEmail } from "../utils/email.js";
+
+router.get("/test-email", async (req, res) => {
+  try {
+    await sendEmail({
+      to: "prathamhegde6@gmail.com",
+      subject: "Smart Hostel – Email Test",
+      html: "<h2>This is a test email from Smart Hostel via Brevo SMTP!</h2>"
+    });
+
+    return res.json({ message: "Email test sent!" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
 
 // PUBLIC ROUTES
 router.post("/login", login);
@@ -39,17 +55,17 @@ router.put("/change-password", protect, changePassword);
 router.post(
   "/chief/warden",
   (req, res, next) => {
-    console.log("🔵 ROUTE HIT: /chief/warden");
+    console.log(" ROUTE HIT: /chief/warden");
     next();
   },
   protect,
   (req, res, next) => {
-    console.log("🟢 PROTECT PASSED");
+    console.log(" PROTECT PASSED");
     next();
   },
   authorizeRoles("chiefWarden"),
   (req, res, next) => {
-    console.log("🟣 AUTHORIZE PASSED (chiefWarden)");
+    console.log(" AUTHORIZE PASSED (chiefWarden)");
     next();
   },
   createWarden
@@ -58,17 +74,17 @@ router.post(
 router.post(
   "/chief/student",
   (req, res, next) => {
-    console.log("🔵 ROUTE HIT: /chief/student");
+    console.log(" ROUTE HIT: /chief/student");
     next();
   },
   protect,
   (req, res, next) => {
-    console.log("🟢 PROTECT PASSED");
+    console.log(" PROTECT PASSED");
     next();
   },
   authorizeRoles("chiefWarden"),
   (req, res, next) => {
-    console.log("🟣 AUTHORIZE PASSED (chiefWarden)");
+    console.log(" AUTHORIZE PASSED (chiefWarden)");
     next();
   },
   createStudent
@@ -89,17 +105,17 @@ router.post(
 router.post(
   "/warden/staff",
   (req, res, next) => {
-    console.log("🔵 ROUTE HIT: /warden/staff");
+    console.log(" ROUTE HIT: /warden/staff");
     next();
   },
   protect,
   (req, res, next) => {
-    console.log("🟢 PROTECT PASSED");
+    console.log(" PROTECT PASSED");
     next();
   },
   authorizeRoles("warden"),
   (req, res, next) => {
-    console.log("🟣 AUTHORIZE PASSED (warden)");
+    console.log(" AUTHORIZE PASSED (warden)");
     next();
   },
   createStaff

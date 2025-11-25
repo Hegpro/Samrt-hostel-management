@@ -385,21 +385,46 @@ export const changePassword = async (req, res) => {
 export const sendPasswordResetCode = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "email required" });
 
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Find user by email
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "No user with that email" });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
 
-    const code = crypto.randomInt(100000, 999999).toString();
+    // 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Expiry: 15 minutes
+    const expiryMinutes = Number(process.env.RESET_CODE_EXPIRY_MIN || 15);
+    const expiry = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    // Store in database
     user.emailVerificationCode = code;
-    user.emailVerificationExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    user.emailVerificationExpiry = expiry;
     await user.save();
 
-    await sendEmail({ to: email, subject: "Password change verification code", text: `Your code is ${code}` });
+    // Send email
+    await sendEmail({
+      to: email,
+      subject: "Smart Hostel – Password Reset Code",
+      html: `
+        <p>Hello ${user.name},</p>
+        <p>Your password reset code is:</p>
+        <h2>${code}</h2>
+        <p>This code will expire in ${expiryMinutes} minutes.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      `
+    });
 
-    return res.json({ message: "Verification code sent to email" });
+    return res.json({ message: "Password reset code sent to email" });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("Reset Code Error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -407,24 +432,49 @@ export const sendPasswordResetCode = async (req, res) => {
 export const verifyCodeAndChangePassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
-    if (!email || !code || !newPassword) return res.status(400).json({ message: "email, code and newPassword required" });
 
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: "Email, code and newPassword are required" });
+    }
+
+    // Find user
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "No user with that email" });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
 
-    if (!user.emailVerificationCode || user.emailVerificationExpiry < new Date())
-      return res.status(400).json({ message: "Code expired or not present" });
+    // Check if code exists
+    if (!user.emailVerificationCode || !user.emailVerificationExpiry) {
+      return res.status(400).json({ message: "No reset request found" });
+    }
 
-    if (user.emailVerificationCode !== code) return res.status(400).json({ message: "Invalid code" });
+    // Check code match
+    if (user.emailVerificationCode !== code) {
+      return res.status(400).json({ message: "Invalid reset code" });
+    }
 
-    user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    // Check expiry
+    if (new Date() > new Date(user.emailVerificationExpiry)) {
+      return res.status(400).json({ message: "Reset code has expired" });
+    }
+
+    // Hash new password
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    // Save new password
+    user.password = hashed;
+
+    // Clear fields
     user.emailVerificationCode = null;
     user.emailVerificationExpiry = null;
     user.tempPassword = false;
+
     await user.save();
 
-    return res.json({ message: "Password changed via email verification" });
+    return res.json({ message: "Password changed successfully" });
+
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("Password Reset Error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
