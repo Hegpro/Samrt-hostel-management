@@ -3,8 +3,8 @@ import { protect, authorizeRoles } from "../middlewares/auth.middleware.js";
 
 import {
   getRoomOccupancy,
-  exportRoomOccupancyExcel,
-  exportRoomOccupancyPDF
+  exportStudentListExcel,
+  exportStudentListPDF
 } from "../controllers/report/report.controller.js";
 
 const router = express.Router();
@@ -14,10 +14,20 @@ const router = express.Router();
 router.get("/rooms", protect, authorizeRoles("chiefWarden", "warden"), getRoomOccupancy);
 
 // Excel
-router.get("/rooms/excel", protect, authorizeRoles("chiefWarden", "warden"), exportRoomOccupancyExcel);
+router.get(
+  "/students/excel",
+  protect,
+  authorizeRoles("chiefWarden", "warden"),
+  exportStudentListExcel
+);
 
 // PDF
-router.get("/rooms/pdf", protect, authorizeRoles("chiefWarden", "warden"), exportRoomOccupancyPDF);
+router.get(
+  "/students/pdf",
+  protect,
+  authorizeRoles("chiefWarden", "warden"),
+  exportStudentListPDF
+);
 
 import {
   getComplaintSummary,

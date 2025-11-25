@@ -10,6 +10,7 @@ import complaintRoutes from "./complaint.routes.js";
 import reportRoutes from "./report.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import studentComplaintRoutes from "./studentComplaint.routes.js";
+import resetRoutes from "./reset.routes.js";
 
 const router = express.Router();
 
@@ -61,5 +62,7 @@ router.use("/reports", reportRoutes);
 router.use("/dashboard", dashboardRoutes);
 
 router.use("/student-complaints", studentComplaintRoutes);
+
+router.use("/reset", resetRoutes);
 
 export default router;

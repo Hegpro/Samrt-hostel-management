@@ -51,89 +51,127 @@ export const getRoomOccupancy = async (req, res) => {
 };
 
 // -----------------------------------------------------------
-// 2. EXPORT ROOM OCCUPANCY TO EXCEL
+// 2. EXPORT STUDENT LIST TO EXCEL (WARDEN + CHIEF)
 // -----------------------------------------------------------
-export const exportRoomOccupancyExcel = async (req, res) => {
+export const exportStudentListExcel = async (req, res) => {
   try {
-    const { hostelId } = req.query;
     const user = await User.findById(req.user.id);
 
-    let finalHostelId = hostelId;
+    let students;
+
     if (user.role === "warden") {
-      finalHostelId = user.hostelId;
+      // Warden → only their hostel
+      students = await User.find({ role: "student", hostelId: user.hostelId })
+        .populate("hostelId", "name")
+        .populate("roomId", "roomNumber");
+    } else {
+      // Chief → all students from all hostels
+      students = await User.find({ role: "student" })
+        .populate("hostelId", "name")
+        .populate("roomId", "roomNumber");
     }
 
-    const rooms = await Room.find({ hostelId: finalHostelId })
-      .populate("students", "name usn");
-
+    // Create Excel file
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Room Occupancy");
+    const sheet = workbook.addWorksheet("Student List");
 
-    sheet.addRow(["Room Number", "Type", "Floor", "Students", "Count"]);
+    // Column differences
+    if (user.role === "chiefWarden") {
+      sheet.addRow(["Name", "USN", "Hostel", "Room", "Signature"]);
+    } else {
+      sheet.addRow(["Name", "USN", "Room", "Signature"]);
+    }
 
-    rooms.forEach(room => {
-      sheet.addRow([
-        room.roomNumber,
-        room.type,
-        room.floor,
-        room.students.map(s => `${s.name} (${s.usn})`).join(", "),
-        room.students.length
-      ]);
+    // Insert rows
+    students.forEach((s) => {
+      if (!s.roomId) return;
+
+      if (user.role === "chiefWarden") {
+        sheet.addRow([
+          s.name,
+          s.usn,
+          s.hostelId?.name || "",
+          s.roomId?.roomNumber || "",
+          ""
+        ]);
+      } else {
+        sheet.addRow([s.name, s.usn, s.roomId?.roomNumber || "", ""]);
+      }
     });
 
-    const fileName = `room_occupancy_${Date.now()}.xlsx`;
-
+    const fileName = `student_list_${Date.now()}.xlsx`;
     await workbook.xlsx.writeFile(fileName);
 
-    return res.download(fileName, fileName, () => {
-      fs.unlinkSync(fileName);
-    });
+    return res.download(fileName, () => fs.unlinkSync(fileName));
 
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: err.message });
   }
 };
 
+
+
 // -----------------------------------------------------------
-// 3. EXPORT ROOM OCCUPANCY TO PDF
+// 3. EXPORT STUDENT LIST TO PDF (WARDEN + CHIEF)
 // -----------------------------------------------------------
-export const exportRoomOccupancyPDF = async (req, res) => {
+export const exportStudentListPDF = async (req, res) => {
   try {
-    const { hostelId } = req.query;
     const user = await User.findById(req.user.id);
 
-    let finalHostelId = hostelId;
+    let students;
+
     if (user.role === "warden") {
-      finalHostelId = user.hostelId;
+      students = await User.find({ role: "student", hostelId: user.hostelId })
+        .populate("hostelId", "name")
+        .populate("roomId", "roomNumber");
+    } else {
+      students = await User.find({ role: "student" })
+        .populate("hostelId", "name")
+        .populate("roomId", "roomNumber");
     }
 
-    const rooms = await Room.find({ hostelId: finalHostelId })
-      .populate("students", "name usn");
+    const fileName = `student_list_${Date.now()}.pdf`;
+    const doc = new PDFDocument({ margin: 40 });
 
-    const fileName = `room_occupancy_${Date.now()}.pdf`;
-    const doc = new PDFDocument();
     doc.pipe(fs.createWriteStream(fileName));
 
-    doc.fontSize(18).text("Room Occupancy Report", { underline: true });
+    doc.fontSize(20).text("Student Allocation Report", { underline: true });
     doc.moveDown();
 
-    rooms.forEach(room => {
-      doc.fontSize(14).text(`Room: ${room.roomNumber}`);
-      doc.text(`Type: ${room.type}`);
-      doc.text(`Floor: ${room.floor}`);
-      doc.text(`Students: ${room.students.map(s => `${s.name} (${s.usn})`).join(", ")}`);
+    if (user.role === "chiefWarden") {
+      doc.fontSize(12).text("Name | USN | Hostel | Room | Signature");
+      doc.moveDown();
+      doc.moveDown();
+    } else {
+      doc.fontSize(12).text("Name | USN | Room | Signature");
+      doc.moveDown();
+      doc.moveDown();
+    }
+
+    students.forEach((s) => {
+      if (!s.roomId) return;
+
+      if (user.role === "chiefWarden") {
+        doc.fontSize(11).text(
+          `${s.name} | ${s.usn} | ${s.hostelId?.name || ""} | ${s.roomId.roomNumber} | ____________`
+        );
+      } else {
+        doc.fontSize(11).text(
+          `${s.name} | ${s.usn} | ${s.roomId.roomNumber} | ____________`
+        );
+      }
       doc.moveDown();
     });
 
     doc.end();
 
     doc.on("finish", () => {
-      res.download(fileName, fileName, () => {
-        fs.unlinkSync(fileName);
-      });
+      res.download(fileName, () => fs.unlinkSync(fileName));
     });
 
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: err.message });
   }
 };
