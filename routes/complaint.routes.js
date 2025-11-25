@@ -8,7 +8,8 @@ import {
   updateComplaintStatus,
   getWardenComplaints,
   wardenCloseComplaint,
-  getChiefComplaints
+  getChiefComplaints,
+  deleteStudentComplaint
 } from "../controllers/complaint/complaint.controller.js";
 
 const router = express.Router();
@@ -85,6 +86,14 @@ router.get(
   authorizeRoles("chiefWarden"),
   getChiefComplaints
 );
+
+router.delete(
+  "/delete/:complaintId",
+  protect,
+  authorizeRoles("student"),
+  deleteStudentComplaint
+);
+
 
 
 export default router;

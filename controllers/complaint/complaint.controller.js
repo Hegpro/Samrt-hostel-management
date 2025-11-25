@@ -65,6 +65,37 @@ const complaintPopulate = [
   }
 ];
 
+export const deleteStudentComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+
+    const complaint = await Complaint.findById(complaintId);
+
+    if (!complaint) {
+      return res.status(404).json({ message: "Complaint not found" });
+    }
+
+    // Only student who created can delete
+    if (complaint.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You can delete only your complaints" });
+    }
+
+    // Only delete if complaint is still pending
+    if (complaint.status !== "pending") {
+      return res.status(400).json({ message: "Cannot delete complaint after it is processed" });
+    }
+
+    await Complaint.findByIdAndDelete(complaintId);
+
+    return res.json({
+      message: "Complaint deleted successfully"
+    });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 
 // --------------------------------------------------------------------
 // 2. STAFF GET COMPLAINTS
