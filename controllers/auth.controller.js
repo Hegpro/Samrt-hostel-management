@@ -494,3 +494,65 @@ export const verifyCodeAndChangePassword = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const getStaffList = async (req, res) => {
+  try {
+    // Get the warden record
+    const warden = await User.findById(req.user.id);
+
+    if (!warden) {
+      return res.status(404).json({ message: "Warden not found" });
+    }
+
+    // Find all staff in the same hostel
+    const staff = await User.find({
+      role: "staff",
+      hostelId: warden.hostelId,   // ⭐ Main filter change
+    }).select("name email phone staffType hostelId createdAt");
+
+    return res.json({ staff });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const deleteStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedUser = await User.findByIdAndDelete(id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    return res.status(200).json({ message: "Staff deleted successfully" });
+  } catch (err) {
+    console.error("Delete Staff Error:", err);
+    return res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const getWardenStudents = async (req, res) => {
+  try {
+    // Base filter: all users with role "student"
+    const filter = { role: "student" };
+
+    // Optional: filter students by warden hostelId
+    if (req.user && req.user.hostelId) {
+      filter.hostelId = req.user.hostelId;
+    }
+
+    // Populate actual room number instead of objectId
+    const students = await User.find(filter)
+      .populate("roomId", "roomNumber") // <- IMPORTANT CHANGE
+      .select("name email phone usn year branch status roomId"); // added roomId for mapping
+
+    return res.status(200).json({ students });
+
+  } catch (error) {
+    console.error("getWardenStudents error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+

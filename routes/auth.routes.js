@@ -13,6 +13,7 @@ import {
   sendNGOVerificationCode,
   verifyNGOCodeAndRegister
 } from "../controllers/auth.controller.js";
+import { getStaffList, deleteStaff, getWardenStudents } from "../controllers/auth.controller.js";
 
 import { protect, authorizeRoles } from "../middlewares/auth.middleware.js";
 
@@ -122,6 +123,24 @@ router.post(
     next();
   },
   createStaff
+);
+
+// 🆕 Warden gets his staff list
+router.get(
+  "/warden/staff",
+  protect,
+  authorizeRoles("warden"),
+  getStaffList
+);
+// const sample = (req,res,err,next) => {  console.log("sample")};
+
+router.delete("/warden/staff/:id",protect,authorizeRoles("warden"), deleteStaff);
+
+router.get(
+  "/warden/students",
+  protect,
+  authorizeRoles("warden"), 
+  getWardenStudents
 );
 
 router.post("/ngo/register", registerNGO);
