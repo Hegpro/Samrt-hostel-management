@@ -21,7 +21,7 @@ router.post(
 router.get(
   "/parent",
   protect,
-  authorizeRoles("parent"),
+  authorizeRoles("parent","warden","chiefWarden"),
   getParentStudentComplaints
 );
 

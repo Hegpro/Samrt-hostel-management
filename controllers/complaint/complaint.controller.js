@@ -416,3 +416,38 @@ export const getComplaintsList = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+
+// -----------------------------------------------------------
+// 7. WARDEN — GET ALL CLOSED COMPLAINTS OF HIS HOSTEL
+// -----------------------------------------------------------
+export const getWardenClosedComplaints = async (req, res) => {
+  try {
+    const warden = await User.findById(req.user.id);
+
+    if (!warden || warden.role !== "warden") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const hostelId = warden.hostelId;
+
+    const complaints = await Complaint.find({
+      hostelId,
+      status: "closed"
+    })
+      .sort({ updatedAt: -1 })
+      .populate("createdBy", "name usn roomId hostelId")
+      .populate({
+        path: "createdBy",
+        populate: { path: "roomId", select: "roomNumber floor type" }
+      })
+      .populate("handledBy", "name staffType");
+
+    return res.status(200).json({
+      message: "Closed complaints fetched",
+      complaints
+    });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};

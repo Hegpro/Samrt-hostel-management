@@ -9,7 +9,8 @@ import {
   getWardenComplaints,
   wardenCloseComplaint,
   getChiefComplaints,
-  deleteStudentComplaint
+  deleteStudentComplaint,
+  getWardenClosedComplaints
 } from "../controllers/complaint/complaint.controller.js";
 
 const router = express.Router();
@@ -94,6 +95,16 @@ router.delete(
   deleteStudentComplaint
 );
 
+// --------------------------------------------------
+// WARDEN: CLOSED COMPLAINTS OF HIS HOSTEL
+// GET /api/complaints/warden/closed
+// --------------------------------------------------
+router.get(
+  "/warden/closed",
+  protect,
+  authorizeRoles("warden"),
+  getWardenClosedComplaints
+);
 
 
 export default router;
