@@ -16,7 +16,10 @@ import {
 
 import { protect, authorizeRoles } from "../middlewares/auth.middleware.js";
 
-console.log(" I AM IN THE AUTH ROUTES FILE YOU EDITED!");
+import { getMe } from "../controllers/auth.controller.js";
+
+
+// console.log(" I AM IN THE AUTH ROUTES FILE YOU EDITED!");
 
 
 const router = express.Router();
@@ -122,6 +125,8 @@ router.post(
 );
 
 router.post("/ngo/register", registerNGO);
+
+router.get("/me", protect, getMe);
 
 
 export default router;

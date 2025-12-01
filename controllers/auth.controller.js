@@ -428,6 +428,22 @@ export const sendPasswordResetCode = async (req, res) => {
   }
 };
 
+// GET LOGGED-IN USER DETAILS
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("name email phone role usn hostelId roomId");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({ user });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
 // verify code and change password (no oldPassword required)
 export const verifyCodeAndChangePassword = async (req, res) => {
   try {

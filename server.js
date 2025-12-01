@@ -8,18 +8,24 @@ import "./cron/surplusExpiry.js";
 
 
 // debug: check env variables
-console.log("===== ENV VARIABLES =====");
-console.log("PORT:", process.env.PORT);
-console.log("MONGO_URI:", process.env.MONGO_URI ? "********" : null);
-console.log("JWT_SECRET:", process.env.JWT_SECRET ? "********" : null);
-console.log("CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME);
-console.log("CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? "********" : null);
-console.log("CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? "********" : null);
-console.log("=========================");
+// console.log("===== ENV VARIABLES =====");
+// console.log("PORT:", process.env.PORT);
+// console.log("MONGO_URI:", process.env.MONGO_URI ? "********" : null);
+// console.log("JWT_SECRET:", process.env.JWT_SECRET ? "********" : null);
+// console.log("CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME);
+// console.log("CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? "********" : null);
+// console.log("CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? "********" : null);
+// console.log("=========================");
 connectDB();
 
 const app = express();
-app.use(cors());
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true, // if you ever send cookies
+}));
+
+
 app.use(express.json());
 
 app.use((req, res, next) => {
