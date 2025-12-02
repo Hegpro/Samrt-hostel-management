@@ -6,7 +6,8 @@ import {
   updateSurplusStatus,
   getAllSurplus,
   getAllNGOs,
-  deleteNGO
+  deleteNGO,
+  getClaimedSurplus
 } from "../controllers/surplus/surplus.controller.js";
 
 import upload from "../middlewares/uploadCloudinary.js";
@@ -58,5 +59,7 @@ router.get(
 router.get("/ngos/all", protect, authorizeRoles("messManager"), getAllNGOs);
 
 router.delete("/ngos/:ngoId", protect, authorizeRoles("messManager"), deleteNGO);
+
+router.get("/claimed", protect, authorizeRoles("ngo"), getClaimedSurplus);
 
 export default router;

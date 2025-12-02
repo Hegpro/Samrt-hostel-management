@@ -58,6 +58,18 @@ export const getAvailableSurplus = async (req, res) => {
   }
 };
 
+// export const getAvailableSurplus = async (req, res) => {
+//   try {
+//     const surplus = await Surplus.find({ status: "available" })
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({ surplus });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
+
 export const claimSurplus = async (req, res) => {
   try {
     const { surplusId } = req.params;
@@ -179,6 +191,31 @@ export const deleteNGO = async (req, res) => {
     return res.status(200).json({ message: "NGO deleted successfully" });
 
   } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const getClaimedSurplus = async (req, res) => {
+  try {
+    // Must be NGO
+    if (req.user.role !== "ngo") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const ngoId = req.user.id;
+
+    const claimed = await Surplus.find({
+      claimedBy: ngoId
+    })
+      .sort({ updatedAt: -1 });
+
+    return res.status(200).json({
+      message: "Claimed surplus fetched",
+      claimed
+    });
+
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: err.message });
   }
 };
