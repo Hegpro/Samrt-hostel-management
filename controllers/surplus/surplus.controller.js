@@ -1,4 +1,5 @@
 import Surplus from "../../models/surplus.model.js";
+import User from "../../models/user.model.js";
 import { uploadToCloudinary } from "../../middlewares/uploadCloudinary.js";
 
 // create surplus post
@@ -109,5 +110,75 @@ export const updateSurplusStatus = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const getAllSurplus = async (req, res) => {
+  try {
+    const userId = req.user.id; // logged-in Mess Manager ID
+
+    const surplus = await Surplus.find({ postedBy: userId })
+      .populate("claimedBy", "name email phone")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Surplus items fetched",
+      surplus
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const getAllNGOs = async (req, res) => {
+  try {
+    // Only messManager can access this
+    if (req.user.role !== "messManager") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const ngos = await User.find({ role: "ngo" })
+      .select("name email phone address createdAt");
+
+    return res.status(200).json({
+      message: "NGOs fetched successfully",
+      ngos
+    });
+
+  } catch (err) {
+    console.error("GET NGO ERROR:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const deleteNGO = async (req, res) => {
+  try {
+    // 1. Validate role
+    if (req.user.role !== "messManager") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const { ngoId } = req.params;
+
+    // 2. Fetch user
+    const ngo = await User.findById(ngoId);
+
+    if (!ngo) {
+      return res.status(404).json({ message: "NGO not found" });
+    }
+
+    // 3. Ensure the user is actually an NGO
+    if (ngo.role !== "ngo") {
+      return res.status(400).json({ message: "User is not an NGO" });
+    }
+
+    // 4. Delete NGO
+    await User.findByIdAndDelete(ngoId);
+
+    return res.status(200).json({ message: "NGO deleted successfully" });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
 };

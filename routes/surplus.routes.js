@@ -3,7 +3,10 @@ import {
   createSurplus,
   getAvailableSurplus,
   claimSurplus,
-  updateSurplusStatus
+  updateSurplusStatus,
+  getAllSurplus,
+  getAllNGOs,
+  deleteNGO
 } from "../controllers/surplus/surplus.controller.js";
 
 import upload from "../middlewares/uploadCloudinary.js";
@@ -43,5 +46,17 @@ router.put(
   authorizeRoles("messManager"),
   updateSurplusStatus
 );
+
+// Get all surplus created by logged-in Mess Manager
+router.get(
+  "/all",
+  protect,
+  authorizeRoles("messManager"),
+  getAllSurplus
+);
+
+router.get("/ngos/all", protect, authorizeRoles("messManager"), getAllNGOs);
+
+router.delete("/ngos/:ngoId", protect, authorizeRoles("messManager"), deleteNGO);
 
 export default router;
