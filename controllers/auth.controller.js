@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/user.model.js";
 import Room from "../models/room.model.js";
+import Hostel from "../models/hostel.model.js";
 import { generatePassword } from "../utils/password.js";
 import { sendEmail } from "../utils/email.js";
 
@@ -619,3 +620,158 @@ export const getStudentsByRoom = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getAllWardens = async (req, res) => {
+  try {
+    const wardens = await User.find({ role: "warden" })
+      .select("name email phone role hostelId createdAt")
+      .populate("hostelId", "name");
+
+    return res.status(200).json({
+      message: "Wardens fetched successfully",
+      wardens,
+    });
+
+  } catch (error) {
+    console.error("getAllWardens error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getAllMessManagers = async (req, res) => {
+  try {
+    const managers = await User.find({ role: "messManager" })
+      .select("name email phone role hostelId createdAt");
+
+    return res.status(200).json({
+      message: "Mess Managers fetched successfully",
+      managers,
+    });
+
+  } catch (error) {
+    console.error("getAllMessManagers error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const deleteWarden = async (req, res) => {
+  try {
+    const { wardenId } = req.params;
+
+    const deleted = await User.findOneAndDelete({
+      _id: wardenId,
+      role: "warden"
+    });
+
+    if (!deleted) return res.status(404).json({ message: "Warden not found" });
+
+    return res.status(200).json({
+      message: "Warden deleted successfully",
+      deleted
+    });
+
+  } catch (error) {
+    console.error("deleteWarden error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const deleteMessManager = async (req, res) => {
+  try {
+    const { messManagerId } = req.params;
+
+    const deleted = await User.findOneAndDelete({
+      _id: messManagerId,
+      role: "messManager"   // Correct based on your DB
+    });
+    console.log("DELETE HIT", req.params);
+    if (!deleted) {
+      return res.status(404).json({ message: "Mess Manager not found" });
+    }
+
+    return res.status(200).json({
+      message: "Mess Manager deleted successfully",
+      deleted,
+    });
+
+  } catch (error) {
+    console.error("deleteMessManager error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getAllHostels = async (req, res) => {
+  try {
+    const hostels = await Hostel.find().select("name totalFloors");
+
+    return res.status(200).json({
+      message: "Hostels fetched successfully",
+      hostels,
+    });
+  } catch (error) {
+    console.error("getAllHostels error:", error);
+    return res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const parentLogin = async (req, res) => {
+  try {
+    const { usn, password } = req.body;
+
+    if (!usn || !password) {
+      return res.status(400).json({ message: "USN and password are required" });
+    }
+
+    // 1️⃣ Find student by USN (or email if needed)
+    const student = await User.findOne({
+      usn: usn,
+      role: "student",
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found for this USN" });
+    }
+
+    // 2️⃣ Find parent linked to this student
+    const parent = await User.findOne({
+      role: "parent",
+      linkedStudent: student._id,
+    });
+
+    if (!parent) {
+      return res.status(404).json({
+        message: "Parent account not created for this student",
+      });
+    }
+
+    // 3️⃣ Validate password
+    const isMatch = await bcrypt.compare(password, parent.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    // 4️⃣ Issue token
+    const token = jwt.sign(
+      { id: parent._id, role: "parent" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.status(200).json({
+      message: "Parent login successful",
+      token,
+      user: {
+        id: parent._id,
+        name: parent.name,
+        studentUsn: student.usn,
+        role: "parent",
+      },
+    });
+
+  } catch (err) {
+    console.error("Parent login error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+

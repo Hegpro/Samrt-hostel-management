@@ -13,7 +13,13 @@ import {
   sendNGOVerificationCode,
   verifyNGOCodeAndRegister,
   deleteStudent,
-  getStudentsByRoom
+  getStudentsByRoom,
+  getAllMessManagers,
+  getAllWardens,
+  deleteMessManager,
+  deleteWarden,
+  getAllHostels,
+  parentLogin
 } from "../controllers/auth.controller.js";
 import { getStaffList, deleteStaff, getWardenStudents } from "../controllers/auth.controller.js";
 
@@ -45,6 +51,7 @@ router.get("/test-email", async (req, res) => {
 
 // PUBLIC ROUTES
 router.post("/login", login);
+router.post("/parent-login", parentLogin);
 // router.post("/ngo/register", registerNGO);
 router.post("/ngo/send-code", sendNGOVerificationCode);
 router.post("/ngo/verify-register", verifyNGOCodeAndRegister);
@@ -117,6 +124,40 @@ router.get(
   getStudentsByRoom
 );
 
+router.get(
+  "/mess-managers/all",
+  protect,
+  authorizeRoles("chiefWarden"),
+  getAllMessManagers
+);    
+
+router.delete(
+  "/mess-managers/:messManagerId",
+  protect,
+  authorizeRoles("chiefWarden"),
+  deleteMessManager
+);  
+
+router.delete(
+  "/wardens/:wardenId",
+  protect,
+  authorizeRoles("chiefWarden"),
+  deleteWarden
+);
+
+router.get(
+  "/wardens/all",
+  protect,
+  authorizeRoles("chiefWarden"),
+  getAllWardens
+);
+
+router.get(
+  "/hostels/all",
+  protect,
+  authorizeRoles("chiefWarden"),
+  getAllHostels
+);
 
 // ==============================================
 // WARDEN ROUTES
