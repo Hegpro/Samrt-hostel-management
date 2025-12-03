@@ -11,7 +11,9 @@ import {
   sendPasswordResetCode,
   verifyCodeAndChangePassword,
   sendNGOVerificationCode,
-  verifyNGOCodeAndRegister
+  verifyNGOCodeAndRegister,
+  deleteStudent,
+  getStudentsByRoom
 } from "../controllers/auth.controller.js";
 import { getStaffList, deleteStaff, getWardenStudents } from "../controllers/auth.controller.js";
 
@@ -99,6 +101,20 @@ router.post(
   protect,
   authorizeRoles("chiefWarden"),
   createMessManager
+);
+
+router.delete(
+  "/remove/:studentId",
+  protect,
+  authorizeRoles("chiefWarden"),  // Only chief warden can remove
+  deleteStudent
+);
+
+router.get(
+  "/students/room/:roomId",
+  protect,
+  authorizeRoles("chiefWarden", "warden"),
+  getStudentsByRoom
 );
 
 

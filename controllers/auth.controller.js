@@ -556,3 +556,66 @@ export const getWardenStudents = async (req, res) => {
   }
 };
 
+export const deleteStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // Find student first
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const roomId = student.roomId;
+
+    // Delete parent linked to this student
+    await User.findOneAndDelete({ linkedStudent: studentId });
+
+    // Delete the student
+    await User.findByIdAndDelete(studentId);
+
+    // Update the room if student was assigned
+    if (roomId) {
+      await Room.findByIdAndUpdate(roomId, {
+        $pull: { occupants: studentId }, // remove student Id from array
+        $inc: { occupied: -1 } // decrease the count
+      });
+    }
+
+    return res.status(200).json({ message: "Student & linked parent removed successfully" });
+
+  } catch (error) {
+    console.error("deleteStudent error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+import mongoose from "mongoose";
+export const getStudentsByRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    if (!roomId) {
+      return res.status(400).json({ message: "Room ID is required" });
+    }
+
+    // Find students assigned to this room
+    const students = await User.find({
+      role: "student",
+      roomId: new mongoose.Types.ObjectId(roomId)   // FIX HERE
+    })
+    .populate("roomId", "roomNumber floor capacity")
+    .select("name email phone usn status roomId");
+
+    return res.status(200).json({
+      message: "Students fetched successfully",
+      students,
+    });
+
+  } catch (error) {
+    console.error("Error fetching students by room:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
