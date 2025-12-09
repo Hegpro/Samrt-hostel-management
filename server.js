@@ -19,7 +19,7 @@ import "./cron/surplusExpiry.js";
 connectDB();
 
 const app = express();
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
+const allowedOrigin = process.env.FRONTEND_URL || "https://smart-hostel-management-frontend-three.vercel.app";
 app.use(cors({
   origin: allowedOrigin,
   credentials: true, // if you ever send cookies
