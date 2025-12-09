@@ -77,7 +77,7 @@ app.use(
 );
 
 // Preflight (OPTIONS) handling
-app.options("*", cors());
+//app.options("/*", cors());
 
 app.use(express.json());
 
