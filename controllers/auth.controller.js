@@ -383,6 +383,53 @@ export const changePassword = async (req, res) => {
 };
 
 // request password change via email OTP: generate code and send
+// export const sendPasswordResetCode = async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     if (!email) {
+//       return res.status(400).json({ message: "Email is required" });
+//     }
+
+//     // Find user by email
+//     const user = await User.findOne({ email });
+//     if (!user) {
+//       return res.status(404).json({ message: "No account found with this email" });
+//     }
+
+//     // 6-digit OTP
+//     const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+//     // Expiry: 15 minutes
+//     const expiryMinutes = Number(process.env.RESET_CODE_EXPIRY_MIN || 15);
+//     const expiry = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+//     // Store in database
+//     user.emailVerificationCode = code;
+//     user.emailVerificationExpiry = expiry;
+//     await user.save();
+
+//     // Send email
+//     await sendEmail({
+//       to: email,
+//       subject: "Smart Hostel – Password Reset Code",
+//       html: `
+//         <p>Hello ${user.name},</p>
+//         <p>Your password reset code is:</p>
+//         <h2>${code}</h2>
+//         <p>This code will expire in ${expiryMinutes} minutes.</p>
+//         <p>If you didn't request this, please ignore this email.</p>
+//       `
+//     });
+//
+//     return res.json({ message: "Password reset code sent to email" });
+//   } catch (err) {
+//     console.error("Reset Code Error:", err);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
+//seperate send mail
 export const sendPasswordResetCode = async (req, res) => {
   try {
     const { email } = req.body;
@@ -391,43 +438,48 @@ export const sendPasswordResetCode = async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    // Find user by email
+    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "No account found with this email" });
     }
 
-    // 6-digit OTP
+    // Generate 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Expiry: 15 minutes
+    // Expiry time
     const expiryMinutes = Number(process.env.RESET_CODE_EXPIRY_MIN || 15);
     const expiry = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
-    // Store in database
+    // Save OTP
     user.emailVerificationCode = code;
     user.emailVerificationExpiry = expiry;
     await user.save();
 
-    // Send email
-    await sendEmail({
-      to: email,
-      subject: "Smart Hostel – Password Reset Code",
-      html: `
-        <p>Hello ${user.name},</p>
-        <p>Your password reset code is:</p>
-        <h2>${code}</h2>
-        <p>This code will expire in ${expiryMinutes} minutes.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      `
+    // Email content
+    const subject = "Smart Hostel – Password Reset Code";
+    const text = `Your password reset code is ${code}. It expires in ${expiryMinutes} minutes.`;
+    const html = `
+      <p>Hello ${user.name},</p>
+      <p>Your password reset code is:</p>
+      <h2>${code}</h2>
+      <p>This code will expire in ${expiryMinutes} minutes.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+    `;
+
+    // ✅ Correct API call
+    await sendEmail(email, subject, text, html);
+
+    return res.status(200).json({
+      message: "Password reset code sent successfully",
     });
 
-    return res.json({ message: "Password reset code sent to email" });
-  } catch (err) {
-    console.error("Reset Code Error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+  } catch (error) {
+    console.error("Reset Code Error:", error.response?.data || error.message);
+    return res.status(500).json({ message: "Failed to send reset code" });
   }
 };
+
 
 // GET LOGGED-IN USER DETAILS
 export const getMe = async (req, res) => {
