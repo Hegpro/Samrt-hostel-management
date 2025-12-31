@@ -3,40 +3,96 @@ import User from "../../models/user.model.js";
 import { uploadToCloudinary } from "../../middlewares/uploadCloudinary.js";
 
 // create surplus post
+// export const createSurplus = async (req, res) => {
+//   try {
+//     const { title, description, quantity, deadline } = req.body;
+
+//     if (!description || !quantity || !deadline) {
+//       return res.status(400).json({ message: "description, quantity and deadline required" });
+//     }
+
+//     let imageUrl = null;
+
+//     if (req.file && req.file.buffer) {
+//       const uploaded = await uploadToCloudinary(req.file.buffer, "surplus");
+//       imageUrl = uploaded.secure_url;
+//     }
+
+//     const surplus = await Surplus.create({
+//       title,
+//       description,
+//       quantity,
+//       deadline,
+//       imageUrl,
+//       postedBy: req.user.id,
+//       status: "available"
+//     });
+
+//     res.status(201).json({
+//       message: "Surplus posted",
+//       surplus
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
 export const createSurplus = async (req, res) => {
   try {
     const { title, description, quantity, deadline } = req.body;
 
+    // ✅ REQUIRED FIELD VALIDATION
     if (!description || !quantity || !deadline) {
-      return res.status(400).json({ message: "description, quantity and deadline required" });
+      return res.status(400).json({
+        message: "description, quantity and deadline are required",
+      });
     }
 
-    let imageUrl = null;
+    // ✅ DEADLINE VALIDATION (CRITICAL FIX)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
+    const expiryDate = new Date(deadline);
+    expiryDate.setHours(0, 0, 0, 0);
+
+    if (expiryDate < today) {
+      return res.status(400).json({
+        message: "Invalid deadline. Past dates are not allowed.",
+      });
+    }
+
+    // ✅ IMAGE UPLOAD (OPTIONAL)
+    let imageUrl = null;
     if (req.file && req.file.buffer) {
       const uploaded = await uploadToCloudinary(req.file.buffer, "surplus");
       imageUrl = uploaded.secure_url;
     }
 
+    // ✅ CREATE SURPLUS
     const surplus = await Surplus.create({
       title,
       description,
       quantity,
-      deadline,
+      deadline: expiryDate,
       imageUrl,
       postedBy: req.user.id,
-      status: "available"
+      status: "available",
     });
 
     res.status(201).json({
-      message: "Surplus posted",
-      surplus
+      message: "Surplus posted successfully",
+      surplus,
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Create surplus error:", err);
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 };
+
 
 export const getAvailableSurplus = async (req, res) => {
   try {
