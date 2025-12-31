@@ -1,6 +1,8 @@
 import Surplus from "../../models/surplus.model.js";
 import User from "../../models/user.model.js";
 import { uploadToCloudinary } from "../../middlewares/uploadCloudinary.js";
+import { sendEmail } from "../../utils/email.js";
+
 
 // create surplus post
 // export const createSurplus = async (req, res) => {
@@ -38,18 +40,98 @@ import { uploadToCloudinary } from "../../middlewares/uploadCloudinary.js";
 //   }
 // };
 
+// export const createSurplus = async (req, res) => {
+//   try {
+//     const { title, description, quantity, deadline } = req.body;
+
+//     if (!description || !quantity || !deadline) {
+//       return res.status(400).json({
+//         message: "description, quantity and deadline are required",
+//       });
+//     }
+
+//     // Deadline validation
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+
+//     const expiryDate = new Date(deadline);
+//     expiryDate.setHours(0, 0, 0, 0);
+
+//     if (expiryDate < today) {
+//       return res.status(400).json({
+//         message: "Invalid deadline. Past dates are not allowed.",
+//       });
+//     }
+
+//     // Image upload
+//     let imageUrl = null;
+//     if (req.file && req.file.buffer) {
+//       const uploaded = await uploadToCloudinary(req.file.buffer, "surplus");
+//       imageUrl = uploaded.secure_url;
+//     }
+
+//     // Create surplus
+//     const surplus = await Surplus.create({
+//       title,
+//       description,
+//       quantity,
+//       deadline: expiryDate,
+//       imageUrl,
+//       postedBy: req.user.id,
+//       status: "available",
+//     });
+
+//     /* ===========================
+//        📧 SEND EMAIL TO ALL NGOs
+//        =========================== */
+
+//     const ngos = await User.find({ role: "ngo" }).select("email name");
+
+//     const subject = "Food surplus posted from SDMCET Mess";
+
+//     const text = `A new food surplus has been posted.\n\nQuantity: ${quantity}\nDeadline: ${expiryDate.toDateString()}`;
+
+//     const html = `
+//       <p>Hello,</p>
+//       <p><strong>SDMCET Mess</strong> has posted a new food surplus.</p>
+//       <ul>
+//         <li><strong>Quantity:</strong> ${quantity}</li>
+//         <li><strong>Deadline:</strong> ${expiryDate.toDateString()}</li>
+//       </ul>
+//       <p>Please log in to the system to claim the surplus.</p>
+//     `;
+
+//     // 🔥 Send emails asynchronously (do NOT block response)
+//     ngos.forEach((ngo) => {
+//       sendEmail(ngo.email, subject, text, html)
+//         .catch(err => console.error("Email failed for:", ngo.email, err.message));
+//     });
+
+//     /* =========================== */
+
+//     return res.status(201).json({
+//       message: "Surplus posted successfully and NGOs notified",
+//       surplus,
+//     });
+
+//   } catch (err) {
+//     console.error("Create surplus error:", err);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// };
+
 export const createSurplus = async (req, res) => {
   try {
     const { title, description, quantity, deadline } = req.body;
 
-    // ✅ REQUIRED FIELD VALIDATION
+    // 🔹 Required field validation
     if (!description || !quantity || !deadline) {
       return res.status(400).json({
         message: "description, quantity and deadline are required",
       });
     }
 
-    // ✅ DEADLINE VALIDATION (CRITICAL FIX)
+    // 🔹 Deadline validation (no past dates)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -62,14 +144,24 @@ export const createSurplus = async (req, res) => {
       });
     }
 
-    // ✅ IMAGE UPLOAD (OPTIONAL)
+    // 🔹 Format expiry date for email (India locale)
+    const formattedExpiry = expiryDate.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    // 🔹 Optional image upload
     let imageUrl = null;
     if (req.file && req.file.buffer) {
       const uploaded = await uploadToCloudinary(req.file.buffer, "surplus");
       imageUrl = uploaded.secure_url;
     }
 
-    // ✅ CREATE SURPLUS
+    // 🔹 Create surplus entry
     const surplus = await Surplus.create({
       title,
       description,
@@ -80,14 +172,51 @@ export const createSurplus = async (req, res) => {
       status: "available",
     });
 
-    res.status(201).json({
-      message: "Surplus posted successfully",
+    /* ==================================================
+       📧 EMAIL NOTIFICATION TO ALL NGOs (ASYNC)
+       ================================================== */
+
+    const ngos = await User.find({ role: "ngo" }).select("email name");
+
+    const subject = "Food surplus posted from SDMCET Mess";
+
+    const text = `
+A new food surplus has been posted from SDMCET Mess.
+
+Quantity: ${quantity}
+Expiry Date: ${formattedExpiry}
+
+Please log in to the system and claim before expiry.
+`;
+
+    const html = `
+      <p>Hello,</p>
+      <p><strong>SDMCET Mess</strong> has posted a new food surplus.</p>
+      <ul>
+        <li><strong>Quantity:</strong> ${quantity}</li>
+        <li><strong>Expiry Date:</strong> ${formattedExpiry}</li>
+      </ul>
+      <p>Please log in to the system and claim the surplus before it expires.</p>
+    `;
+
+    // 🔹 Send emails without blocking API response
+    ngos.forEach((ngo) => {
+      sendEmail(ngo.email, subject, text, html)
+        .catch((err) =>
+          console.error(`Email failed for ${ngo.email}:`, err.message)
+        );
+    });
+
+    /* ================================================== */
+
+    return res.status(201).json({
+      message: "Surplus posted successfully and NGOs notified",
       surplus,
     });
 
   } catch (err) {
     console.error("Create surplus error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
@@ -126,35 +255,245 @@ export const getAvailableSurplus = async (req, res) => {
 // };
 
 
+// export const claimSurplus = async (req, res) => {
+//   try {
+//     const { surplusId } = req.params;
+
+//     const surplus = await Surplus.findById(surplusId);
+//     if (!surplus) return res.status(404).json({ message: "Not found" });
+
+//     // Check if already taken
+//     if (surplus.status !== "available") {
+//       return res.status(400).json({ message: "Already claimed or unavailable" });
+//     }
+
+//     // Check deadline
+//     const now = new Date();
+//     if (surplus.deadline < now) {
+//       surplus.status = "expired";
+//       await surplus.save();
+//       return res.status(400).json({ message: "Food already expired" });
+//     }
+
+//     // Claim
+//     surplus.claimedBy = req.user.id;
+//     surplus.status = "claimed";
+//     await surplus.save();
+
+//     res.status(200).json({ message: "Claimed successfully", surplus });
+
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
+// export const claimSurplus = async (req, res) => {
+//   try {
+//     const { surplusId } = req.params;
+
+//     // 🔹 Find surplus
+//     const surplus = await Surplus.findById(surplusId)
+//       .populate("postedBy", "name email")
+//       .populate("claimedBy", "name email phone");
+
+//     if (!surplus) {
+//       return res.status(404).json({ message: "Surplus not found" });
+//     }
+
+//     // 🔹 Check availability
+//     if (surplus.status !== "available") {
+//       return res.status(400).json({
+//         message: "Already claimed or unavailable",
+//       });
+//     }
+
+//     // 🔹 Check expiry
+//     const now = new Date();
+//     if (surplus.deadline < now) {
+//       surplus.status = "expired";
+//       await surplus.save();
+//       return res.status(400).json({
+//         message: "Food already expired",
+//       });
+//     }
+
+//     // 🔹 Claim surplus
+//     surplus.claimedBy = req.user.id;
+//     surplus.status = "claimed";
+//     await surplus.save();
+
+//     /* ==================================================
+//        📧 EMAIL TO MESS MANAGER (ASYNC)
+//        ================================================== */
+
+//     const messManager = surplus.postedBy;
+//     const ngo = surplus.claimedBy;
+
+//     // Format pickup deadline
+//     const formattedExpiry = surplus.deadline.toLocaleString("en-IN", {
+//       day: "2-digit",
+//       month: "long",
+//       year: "numeric",
+//       hour: "2-digit",
+//       minute: "2-digit",
+//       hour12: true,
+//     });
+
+//     const subject = "Food surplus pickup confirmed";
+
+//     const text = `
+// Hello ${messManager.name},
+
+// Your food surplus has been claimed by an NGO.
+
+// NGO Name: ${ngo.name}
+// NGO Email: ${ngo.email}
+// NGO Phone: ${ngo.phone || "Not provided"}
+
+// Pickup Deadline: ${formattedExpiry}
+
+// Please coordinate the pickup accordingly.
+// `;
+
+//     const html = `
+//       <p>Hello <strong>${messManager.name}</strong>,</p>
+
+//       <p>Your food surplus has been <strong>claimed successfully</strong>.</p>
+
+//       <h4>NGO Details</h4>
+//       <ul>
+//         <li><strong>Name:</strong> ${ngo.name}</li>
+//         <li><strong>Email:</strong> ${ngo.email}</li>
+//         <li><strong>Phone:</strong> ${ngo.phone || "Not provided"}</li>
+//       </ul>
+
+//       <p><strong>Pickup Deadline:</strong> ${formattedExpiry}</p>
+
+//       <p>Please coordinate with the NGO for a smooth pickup.</p>
+//     `;
+
+//     sendEmail(messManager.email, subject, text, html)
+//       .catch(err =>
+//         console.error("Mess manager email failed:", err.message)
+//       );
+
+//     /* ================================================== */
+
+//     return res.status(200).json({
+//       message: "Claimed successfully. Mess manager notified.",
+//       surplus,
+//     });
+
+//   } catch (err) {
+//     console.error("Claim surplus error:", err);
+//     return res.status(500).json({
+//       message: "Server error",
+//     });
+//   }
+// };
+
+
 export const claimSurplus = async (req, res) => {
   try {
     const { surplusId } = req.params;
 
-    const surplus = await Surplus.findById(surplusId);
-    if (!surplus) return res.status(404).json({ message: "Not found" });
+    // 1️⃣ Fetch surplus (postedBy populated)
+    const surplus = await Surplus.findById(surplusId)
+      .populate("postedBy", "name email");
 
-    // Check if already taken
-    if (surplus.status !== "available") {
-      return res.status(400).json({ message: "Already claimed or unavailable" });
+    if (!surplus) {
+      return res.status(404).json({ message: "Surplus not found" });
     }
 
-    // Check deadline
+    // 2️⃣ Check availability
+    if (surplus.status !== "available") {
+      return res.status(400).json({
+        message: "Already claimed or unavailable",
+      });
+    }
+
+    // 3️⃣ Check expiry
     const now = new Date();
     if (surplus.deadline < now) {
       surplus.status = "expired";
       await surplus.save();
-      return res.status(400).json({ message: "Food already expired" });
+      return res.status(400).json({
+        message: "Food already expired",
+      });
     }
 
-    // Claim
+    // 4️⃣ Claim surplus
     surplus.claimedBy = req.user.id;
     surplus.status = "claimed";
     await surplus.save();
 
-    res.status(200).json({ message: "Claimed successfully", surplus });
+    // 5️⃣ Re-fetch surplus WITH NGO populated
+    const populatedSurplus = await Surplus.findById(surplusId)
+      .populate("postedBy", "name email")
+      .populate("claimedBy", "name email phone");
+
+    const messManager = populatedSurplus.postedBy;
+    const ngo = populatedSurplus.claimedBy;
+
+    // 6️⃣ Format DATE ONLY (no time)
+    const formattedDate = populatedSurplus.deadline.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }
+    );
+
+    // 7️⃣ Email content
+    const subject = "Food surplus pickup confirmed";
+
+    const text = `
+Hello ${messManager.name},
+
+Your food surplus has been claimed by an NGO.
+
+NGO Name: ${ngo.name}
+NGO Email: ${ngo.email}
+NGO Phone: ${ngo.phone || "Not provided"}
+
+Pickup Date: ${formattedDate}
+
+Please coordinate the pickup accordingly.
+`;
+
+    const html = `
+      <p>Hello <strong>${messManager.name}</strong>,</p>
+
+      <p>Your food surplus has been <strong>claimed successfully</strong>.</p>
+      <h4>NGO Details</h4>
+      <ul>
+        <li><strong>Name:</strong> ${ngo.name}</li>
+        <li><strong>Email:</strong> ${ngo.email}</li>
+        <li><strong>Phone:</strong> ${ngo.phone || "Not provided"}</li>
+      </ul>
+
+      <p><strong>Pickup Date:</strong> ${formattedDate}</p>
+
+      <p>Please coordinate with the NGO for a smooth pickup.</p>
+    `;
+
+    // 8️⃣ Send email (async)
+    sendEmail(messManager.email, subject, text, html)
+      .catch(err =>
+        console.error("Mess manager email failed:", err.message)
+      );
+
+    return res.status(200).json({
+      message: "Claimed successfully. Mess manager notified.",
+      surplus: populatedSurplus,
+    });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Claim surplus error:", err);
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 };
 
